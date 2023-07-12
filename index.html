@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="charset" content="UTF-8">
+    <meta name="author" content="Moshe Chaikin">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16x16.png">
+    <link rel="manifest" href="assets/favicon/site.webmanifest">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa"
+            crossorigin="anonymous"></script>
+    <title>International SIM Dialer</title>
+    <style>
+        * {
+            outline: none;
+        }
+        body {
+            padding: 15px;
+        }
+
+        h1.main-heading {
+            color: blueviolet;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        button.nav-link {
+            font-size: 22px;
+        }
+
+        input, select {
+            margin-bottom: 5px;
+        }
+
+        #telInput, #calling-method, div.list-group {
+            max-width: 475px;
+            font-size: 22px;
+        }
+
+        #telInput {
+            font-size: 28px;
+        }
+
+        button.call-btn, button.plus-btn {
+            height: 56px;
+            max-width: 210px;
+            width: 49%;
+            font-size: 24px;
+        }
+
+        i.removeFavorite {
+            border: none;
+            color: red;
+            width: 55px;
+            background: none;
+            padding-right: 15px;
+        }
+        p.footnote {
+            max-width: 450px;
+            margin-top: 15px;
+        }
+
+        i.bi-telephone-outbound {
+            padding-right: 10px;
+        }
+    </style>
+    <script>
+        const call = () => {
+            window.open(telNumber(), '_self');
+        };
+
+        const telNumber = () => {
+            const select = document.getElementById('calling-method');
+            let tel = document.getElementById('telInput').value;
+            if (tel.startsWith('0')) {
+                do { tel = tel.substring(1); } while (tel.startsWith('0'));
+            }
+            if (!document.getElementById('telInput').value) return;
+
+            tel = 'tel:' + select.options[select.selectedIndex].getAttribute('title') + tel;
+
+            return tel;
+        };
+
+        // enabling call/add to favorites button when user starts entering tel #
+        const enableButtons = () => {
+            if (document.getElementById('telInput').value.length > 0) {
+                document.getElementsByClassName('call-btn')[0].disabled = false;
+                document.getElementsByClassName('plus-btn')[0].disabled = false;
+            } else {
+                document.getElementsByClassName('call-btn')[0].disabled = true;
+                document.getElementsByClassName('plus-btn')[0].disabled = true;
+            }
+        };
+
+        // extend localStorage to work with objects
+        Storage.prototype.setObject = function(key, value) {
+            this.setItem(key, JSON.stringify(value));
+        }
+
+        Storage.prototype.getObject = function(key) {
+            let value = this.getItem(key);
+            return value && JSON.parse(value);
+        }
+
+        const clearFields = () => {
+            document.getElementById('telInput').value = '';
+            document.getElementById('favorite-name').value = '';
+        };
+
+        const getFavorites = () => {
+            if (!localStorage.getObject('favorites')) return null;
+            return localStorage.getObject('favorites');
+        };
+
+        const saveFavorite = () => {
+            if (document.getElementById('favorite-name').value === '') {
+                document.getElementById('favorite-name').style.border = '1px solid red';
+            } else {
+                let storedFavorites = getFavorites();
+                if (!storedFavorites) storedFavorites = [];
+                storedFavorites.push({
+                    name: document.getElementById('favorite-name').value,
+                    tel: telNumber()
+                });
+                localStorage.setObject('favorites', storedFavorites);
+                listFavorites();
+                clearFields();
+                let myModalEl = document.getElementById('favoritesModal');
+                let modal = bootstrap.Modal.getInstance(myModalEl)
+                modal.hide();
+                document.getElementById('favorite-name').style.border = '1px solid #ced4da';
+                document.getElementsByClassName('call-btn')[0].disabled = true;
+                document.getElementsByClassName('plus-btn')[0].disabled = true;
+            }
+        };
+
+        const removeFavorite = (scope, href) => {
+            let updatedFavorites = getFavorites('favorites');
+            updatedFavorites = updatedFavorites.filter(fav => fav.tel !== href);
+
+            if (updatedFavorites.length === 0) {
+                localStorage.clear();
+                document.getElementById('favoritesList')
+                    .innerHTML = `<h6 class="text-danger" style="margin-left: 5px;">No favorites to see here!</h6>`;
+                document.getElementById('editFavorites').style.display = 'none';
+                document.getElementById('doneEditingFavorites').style.display = 'none';
+            } else {
+                localStorage.setObject('favorites', updatedFavorites);
+            }
+            scope.remove();
+        };
+
+        const handler = (e) => {
+            e.preventDefault();
+
+            let path = e.composedPath()[1];
+            if (!path.getAttribute('href')) path = e.composedPath()[0];
+            removeFavorite(path, path.getAttribute('href'));
+        };
+
+        const editFavorites = () => {
+            let favoriteLinks = document.getElementsByClassName('favoriteLink');
+            let removeFavoriteButton = document.getElementsByClassName('removeFavorite');
+            for (let i=0;i<favoriteLinks.length;i++) {
+                favoriteLinks[i].addEventListener('click', handler);
+                removeFavoriteButton[i].style.display = 'inline';
+                removeFavoriteButton[i].disabled = false;
+            }
+            document.getElementById('editFavorites').style.display = 'none';
+            document.getElementById('doneEditingFavorites').style.display = 'inline';
+        };
+
+        const doneEditingFavorites = () => {
+            let favoriteLinks = document.getElementsByClassName('favoriteLink');
+            let removeFavoriteButton = document.getElementsByClassName('removeFavorite');
+            for (let i=0;i<favoriteLinks.length;i++) {
+                favoriteLinks[i].removeEventListener('click', handler);
+                removeFavoriteButton[i].style.display = 'none';
+                removeFavoriteButton[i].disabled = true;
+            }
+            document.getElementById('editFavorites').style.display = 'inline';
+            document.getElementById('doneEditingFavorites').style.display = 'none';
+        };
+
+        const listFavorites = () => {
+            let favoritesList = document.getElementById('favoritesList');
+            favoritesList.innerHTML = ``;
+            let favorites = getFavorites();
+            if (!favorites) {
+                favoritesList.innerHTML = `<h6 class="text-danger" style="margin-left: 5px;">No favorites to see here!</h6>`;
+                document.getElementById('editFavorites').style.display = 'none';
+                document.getElementById('doneEditingFavorites').style.display = 'none';
+            } else {
+                document.getElementById('editFavorites').style.display = 'inline';
+                document.getElementById('doneEditingFavorites').style.display = 'none';
+
+                getFavorites().forEach((favorite) => {
+                    favoritesList.insertAdjacentHTML('beforeend', `
+                       <a href="${favorite.tel}" class="favoriteLink list-group-item list-group-item-action">
+                            <i class="bi bi-dash-circle-fill removeFavorite" style="display: none;"></i>
+                            <i class="bi bi-telephone-outbound text-success"></i> ${favorite.name}
+                       </a>
+                    `);
+                });
+            }
+        };
+
+        // only load favorites into DOM when fully loaded
+        window.addEventListener('DOMContentLoaded', function() {
+            listFavorites();
+        });
+    </script>
+</head>
+<body>
+
+<h1 class="main-heading shadow-lg"><i class="bi bi-globe"></i> International SIM Dialer</h1>
+
+<ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="pills-favorites-tab" data-bs-toggle="pill" data-bs-target="#pills-favorites"
+                type="button" role="tab" aria-controls="pills-favorites" aria-selected="true">
+            <i class="bi bi-bookmark-heart"></i> Favorites
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pills-profile-tab" data-bs-toggle="pill" data-bs-target="#pills-dialer"
+                type="button" role="tab" aria-controls="pills-dialer" aria-selected="false">
+            <i class="bi bi-telephone-plus"></i> Dialer
+        </button>
+    </li>
+</ul>
+
+<hr>
+
+<div class="tab-content" id="pills-tabContent">
+    <div class="tab-pane fade show active" id="pills-favorites" role="tabpanel" aria-labelledby="pills-favorites-tab"
+         tabindex="0">
+        <h1>
+            <i class="bi bi-bookmark-heart"></i> Favorites
+            <button class="btn btn-light" id="editFavorites" onclick="editFavorites();">
+                Edit
+            </button>
+            <button class="btn btn-primary" style="display: none;" id="doneEditingFavorites" onclick="doneEditingFavorites();">
+                Done
+            </button>
+        </h1>
+
+        <div class="list-group" id="favoritesList"></div>
+    </div>
+
+    <div class="tab-pane fade" id="pills-dialer" role="tabpanel" aria-labelledby="pills-dialer-tab" tabindex="0">
+        <div class="modal fade" id="favoritesModal" tabindex="-1" aria-labelledby="favoritesModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="favoritesModalLabel">
+                            <i class="bi bi-bookmark-heart-fill"></i> Add Favorites
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <label class="form-label">Enter name:</label>
+                        <input type="text" maxlength="25" class="form-control" aria-label="favoriteName"
+                               id="favorite-name" name="Name" placeholder="Name of favorite" autofocus required>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-lg" data-bs-dismiss="modal" onclick="document.getElementById('favorite-name').value = '';">Cancel</button>
+                        <button type="button" class="btn btn-primary btn-lg" onclick="saveFavorite();">
+                            <i class="bi bi-bookmark-heart-fill"></i> Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h1><i class="bi bi-telephone-plus"></i> Dialer</h1>
+
+        <div class="calling-method">
+            <label for="calling-method" class="form-label">Choose where to call:</label>
+            <select name="calling-method" id="calling-method" class="form-select">
+                <option value="USA" title="001" selected>USA/Canada</option>
+                <option value="Verizon Forward to Intl SIM card" title="*72">Verizon Forward to Intl SIM card</option>
+                <option value="Call another SIM" title="0044">another SIM card user</option>
+                <option value="Israel" title="00972">Israel</option>
+                <option value="Albania" title="00355">Albania</option>
+                <option value="Andorra" title="00376">Andorra</option>
+                <option value="Argentina" title="0054">Argentina</option>
+                <option value="Australia" title="0061">Australia</option>
+                <option value="Austria" title="0043">Austria</option>
+                <option value="Belgium" title="0032">Belgium</option>
+                <option value="Bosnia and Herzegovina" title="00387">Bosnia and Herzegovina</option>
+                <option value="Brazil" title="0055">Brazil</option>
+                <option value="Bulgaria" title="00359">Bulgaria</option>
+                <option value="Costa Rica" title="00506">Costa Rica</option>
+                <option value="Croatia" title="00385">Croatia</option>
+                <option value="Cyprus (excluding northern Cyprus)" title="00357">Cyprus (excluding northern Cyprus)</option>
+                <option value="Czech Republic" title="00420">Czech Republic</option>
+                <option value="Denmark" title="0045">Denmark</option>
+                <option value="Dominican Republic" title="00809">Dominican Republic</option>
+                <option value="Estonia" title="00372">Estonia</option>
+                <option value="Fare Islands" title="00298">Fare Islands</option>
+                <option value="Finland" title="00358">Finland</option>
+                             <option value="France (inc French West Indies & Reunion)" title="0033">France (inc French West Indies & Reunion)</option>
+                <option value="Germany" title="0049">Germany</option>
+                <option value="Gibraltar" title="00350">Gibraltar</option>
+                <option value="Greece" title="0030">Greece</option>
+                <option value="Hungary" title="0036">Hungary</option>
+                <option value="Iceland" title="00354">Iceland</option>
+                <option value="Ireland" title="00353">Ireland</option>
+                <option value="Italy (inc. San Marino and Vatican City)" title="0039">Italy (inc. San Marino and Vatican City)</option>
+                <option value="Latvia" title="00371">Latvia</option>
+                <option value="Liechtenstein" title="00423">Liechtenstein</option>
+                <option value="Lithuania" title="00370">Lithuania</option>
+                <option value="Luxembourg" title="00352">Luxembourg</option>
+                <option value="Malta" title="00356">Malta</option>
+                <option value="Mexico" title="0052">Mexico</option>
+                <option value="Monaco" title="00377">Monaco</option>
+                <option value="Morocco" title="00212">Morocco</option>
+                <option value="Netherlands" title="0031">Netherlands</option>
+                <option value="Norway" title="0047">Norway</option>
+                <option value="Panama" title="00507">Panama</option>
+                <option value="Poland" title="0048">Poland</option>
+                <option value="Portugal (inc. Madeira)" title="00351">Portugal (inc. Madeira)</option>
+                <option value="Romania" title="0040">Romania</option>
+                <option value="Russia" title="007">Russia</option>
+                <option value="Slovakia" title="00421">Slovakia</option>
+                <option value="Slovenia" title="00386">Slovenia</option>
+                <option value="South Africa" title="0027">South Africa</option>
+                <option value="Spain (inc. Balearic Islands & Canary Islands)" title="0034">Spain (inc. Balearic Islands & Canary Islands)</option>
+                <option value="Sweden" title="0046">Sweden</option>
+                <option value="CH" title="0041">Switzerland</option>
+                <option value="Turkey" title="0090">Turkey</option>
+                <option value="Ukraine" title="00380">Ukraine</option>
+                <option value="United Kingdom (from outside UK)" title="00434">United Kingdom (from outside UK)</option>
+                <option value="United Kingdom (from inside UK)" title="">United Kingdom (from inside UK)</option>
+            </select>
+        </div>
+
+        <input type="tel" onkeyup="enableButtons();" aria-label="telInput" placeholder="Phone #" maxlength="20" id="telInput"
+               class="form-control">
+        <button class="btn btn-secondary plus-btn" style="font-size: 18px;" data-bs-toggle="modal"
+                data-bs-target="#favoritesModal" disabled>
+            <i class="bi bi-bookmark-heart-fill"></i> Add to Favorites
+        </button>
+
+        <button onclick="call();" class="btn btn-success call-btn" disabled>
+            <i class="bi bi-telephone-outbound"></i> Call
+        </button>
+    </div>
+</div>
+</body>
+</html>
